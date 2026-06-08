@@ -13,15 +13,15 @@ export function calcWeightedScore(slots: SlotDef[]): number {
 }
 
 export function toStars(score: number): number {
-  if (score < 6.0) return 0.5
-  if (score < 6.5) return 1
-  if (score < 7.0) return 1.5
-  if (score < 7.4) return 2
-  if (score < 7.7) return 2.5
-  if (score < 8.0) return 3
-  if (score < 8.3) return 3.5
-  if (score < 8.6) return 4
-  if (score < 8.9) return 4.5
+  if (score < 5.5) return 0.5
+  if (score < 6.0) return 1
+  if (score < 6.3) return 1.5
+  if (score < 6.6) return 2
+  if (score < 6.9) return 2.5
+  if (score < 7.2) return 3
+  if (score < 7.5) return 3.5
+  if (score < 7.9) return 4
+  if (score < 8.3) return 4.5
   return 5
 }
 
