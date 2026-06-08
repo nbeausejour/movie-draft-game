@@ -31,7 +31,7 @@ const DB_DIR   = join(process.cwd(), 'data');
 const DB_PATH  = join(DB_DIR, 'game.db');
 
 const MIN_VOTES   = 10_000;   // a title needs at least this many votes to count
-const MIN_CREDITS = 2;        // a person needs this many titles in a decade to get a card
+const MIN_CREDITS = 3;        // a person needs this many titles in a decade to get a card
 
 // How many people to keep per role (we rank by total vote count)
 const POOL_SIZES = {
@@ -113,6 +113,28 @@ async function main() {
   });
   logLine(`  ✓ ${movies.size.toLocaleString()} qualifying movies`);
 
+  // ── Pass 2b: load primary professions ────────────────────────────────────
+  // We only want people whose main IMDB profession matches the role.
+  // This filters out extras, stunt performers, and crew who appear in
+  // high-rated films but aren't really actors/directors/etc.
+  logLine('Pass 2b — loading primary professions...');
+  const professions = new Map(); // nconst → primaryProfession (first listed)
+  await streamTSV(`${IMDB_DIR}/name.basics.tsv.gz`, ([nconst, , , , primaryProfession]) => {
+    if (primaryProfession && primaryProfession !== '\\N') {
+      professions.set(nconst, primaryProfession.split(',')[0]); // first = primary
+    }
+  });
+  logLine(`  ✓ ${professions.size.toLocaleString()} people loaded`);
+
+  // Which primary professions are acceptable for each role
+  const ALLOWED_PROFESSIONS = {
+    director:        new Set(['director']),
+    actor:           new Set(['actor', 'actress']),
+    actress:         new Set(['actress', 'actor']),
+    cinematographer: new Set(['cinematographer']),
+    writer:          new Set(['writer']),
+  };
+
   // ── Pass 3: scan principals ───────────────────────────────────────────────
   // For each person×role×decade, collect the movies they appeared in.
   // Structure: personCredits[nconst][role][decade] = [{ tconst, numVotes, ... }]
@@ -128,6 +150,9 @@ async function main() {
     if (!ROLES_WE_TRACK.has(category)) return;
     const movie = movies.get(tconst);
     if (!movie) return;
+    // Skip people whose primary profession doesn't match this role
+    const prof = professions.get(nconst);
+    if (!prof || !ALLOWED_PROFESSIONS[category]?.has(prof)) return;
 
     // Update total vote tally for this person in this role
     if (!personTotalVotes.has(nconst)) personTotalVotes.set(nconst, new Map());
