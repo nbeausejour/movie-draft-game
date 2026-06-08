@@ -52,7 +52,7 @@ export async function GET(request: NextRequest) {
     role: card.role,
     decade: card.decade,
     avgRating: card.avg_rating,
-    films: films.map(f => ({
+    films: films.map((f: { tconst: string; title: string; year: number; num_votes: number; avg_rating: number }) => ({
       tconst: f.tconst,
       title: f.title,
       year: f.year,
