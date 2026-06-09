@@ -237,11 +237,22 @@ async function main() {
     );
 
     CREATE INDEX idx_cards_role ON cards(role);
+
+    -- Well-known reference movies at each score level (rounded to 1 decimal).
+    -- Used on the results screen to show "same score as: Home Alone, ..."
+    CREATE TABLE reference_movies (
+      tconst    TEXT PRIMARY KEY,
+      title     TEXT NOT NULL,
+      rating    REAL NOT NULL,   -- rounded to 1 decimal
+      num_votes INTEGER NOT NULL
+    );
+    CREATE INDEX idx_ref_rating ON reference_movies(rating);
   `);
 
   const insertPerson = db.prepare('INSERT OR IGNORE INTO people (id, name) VALUES (?, ?)');
   const insertCard   = db.prepare('INSERT INTO cards (person_id, role, decade, avg_rating, num_films) VALUES (?, ?, ?, ?, ?)');
   const insertFilm   = db.prepare('INSERT INTO card_films (card_id, tconst, title, year, num_votes, avg_rating) VALUES (?, ?, ?, ?, ?, ?)');
+  const insertRef    = db.prepare('INSERT OR IGNORE INTO reference_movies (tconst, title, rating, num_votes) VALUES (?, ?, ?, ?)');
 
   let cardCount = 0;
   const insertAll = db.transaction(() => {
@@ -275,6 +286,30 @@ async function main() {
     }
   });
   insertAll();
+
+  // ── Reference movies ──────────────────────────────────────────────────────
+  // For each 0.1-step rating bucket, store the 5 most-voted movies.
+  // These are used on the results screen ("same score as: ...").
+  // We bucket by ROUND(avgRating, 1) and take the top 5 by numVotes,
+  // but require at least 100k votes so only well-known films appear.
+  logLine('  Building reference movies table...');
+  const MIN_REF_VOTES = 100_000;
+  const byRating = new Map(); // rounded rating → sorted array of {tconst, title, numVotes}
+  for (const [tconst, movie] of movies) {
+    if (movie.numVotes < MIN_REF_VOTES) continue;
+    const bucket = Math.round(movie.avgRating * 10) / 10;
+    if (!byRating.has(bucket)) byRating.set(bucket, []);
+    byRating.get(bucket).push({ tconst, title: movie.title, numVotes: movie.numVotes });
+  }
+  const insertRefs = db.transaction(() => {
+    for (const [rating, films] of byRating) {
+      films.sort((a, b) => b.numVotes - a.numVotes);
+      films.slice(0, 5).forEach(f => insertRef.run(f.tconst, f.title, rating, f.numVotes));
+    }
+  });
+  insertRefs();
+  logLine(`  ✓ Reference movies written for ${byRating.size} rating buckets`);
+
   db.close();
 
   logLine(`\n✅ Done! Database written to ${DB_PATH}`);
