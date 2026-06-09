@@ -58,12 +58,16 @@ Start your response with just the title on its own line, then a blank line, then
       return Response.json({ summary: null, title: null })
     }
     const data = await res.json()
-    const text: string = data.candidates?.[0]?.content?.parts?.[0]?.text ?? ''
+    console.log('Gemini raw response:', JSON.stringify(data).slice(0, 500))
 
-    // Split title from body
-    const lines = text.trim().split('\n').filter((l: string) => l.trim())
-    const title   = lines[0]?.trim() ?? null
+    const text: string = data.candidates?.[0]?.content?.parts?.[0]?.text ?? ''
+    console.log('Gemini text:', text.slice(0, 200))
+
+    // Split title from body — first non-empty line is the title
+    const lines = text.trim().split('\n').map((l: string) => l.trim()).filter(Boolean)
+    const title   = lines[0] || null
     const summary = lines.slice(1).join(' ').trim() || null
+    console.log('Parsed title:', title, '| summary length:', summary?.length)
 
     return Response.json({ title, summary })
   } catch {
