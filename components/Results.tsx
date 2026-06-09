@@ -8,12 +8,16 @@ import type { CompareMovie } from '@/app/api/compare/route'
 
 interface Props {
   slots: SlotDef[]
+  genre: string
   onPlayAgain: () => void
 }
 
-export default function Results({ slots, onPlayAgain }: Props) {
+export default function Results({ slots, genre, onPlayAgain }: Props) {
   const [copied, setCopied] = useState(false)
   const [compareMovies, setCompareMovies] = useState<CompareMovie[]>([])
+  const [filmTitle, setFilmTitle]   = useState<string | null>(null)
+  const [summary, setSummary]       = useState<string | null>(null)
+  const [summaryLoading, setSummaryLoading] = useState(true)
 
   const score = calcWeightedScore(slots)
   const stars = toStars(score)
@@ -26,8 +30,25 @@ export default function Results({ slots, onPlayAgain }: Props) {
       .catch(() => {})
   }, [score])
 
+  useEffect(() => {
+    fetch('/api/summary', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ slots, genre }),
+    })
+      .then(r => r.json())
+      .then(data => {
+        setFilmTitle(data.title)
+        setSummary(data.summary)
+      })
+      .catch(() => {})
+      .finally(() => setSummaryLoading(false))
+  }, [genre]) // eslint-disable-line react-hooks/exhaustive-deps
+
   function handleShare() {
-    const text = buildShareText(slots, stars)
+    const titleLine = filmTitle ? `"${filmTitle}" — A ${genre} Film\n\n` : ''
+    const summaryLine = summary ? `${summary}\n\n` : ''
+    const text = titleLine + summaryLine + buildShareText(slots, stars)
     navigator.clipboard.writeText(text).then(() => {
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)
@@ -94,6 +115,54 @@ export default function Results({ slots, onPlayAgain }: Props) {
           </div>
         ) : (
           <p className="text-xs" style={{ color: 'var(--ink-faded)' }}>…</p>
+        )}
+      </div>
+
+      {/* AI-generated fake film review */}
+      <div
+        className="shadow-sm"
+        style={{ background: 'var(--card-bg)', border: '2px solid var(--border)', borderRadius: '6px', padding: '1.25rem 1.25rem' }}
+      >
+        {/* Genre badge */}
+        <div className="flex items-center gap-3 mb-4">
+          <div className="h-px flex-1" style={{ background: 'var(--border)' }} />
+          <span
+            className="text-[9px] tracking-[0.25em] uppercase px-3 py-1"
+            style={{
+              background: 'var(--ink)',
+              color: 'var(--gold)',
+              fontFamily: 'var(--font-special-elite), serif',
+              borderRadius: '2px',
+            }}
+          >
+            {genre}
+          </span>
+          <div className="h-px flex-1" style={{ background: 'var(--border)' }} />
+        </div>
+
+        {summaryLoading ? (
+          <p className="text-center text-xs animate-pulse" style={{ color: 'var(--ink-faded)', fontFamily: 'var(--font-special-elite), serif' }}>
+            Writing your review…
+          </p>
+        ) : filmTitle ? (
+          <>
+            <p
+              className="font-display font-bold text-lg leading-tight mb-3"
+              style={{ color: 'var(--ink)' }}
+            >
+              {filmTitle}
+            </p>
+            <p
+              className="text-sm leading-relaxed"
+              style={{ color: 'var(--ink-faded)', fontFamily: 'var(--font-special-elite), serif' }}
+            >
+              {summary}
+            </p>
+          </>
+        ) : (
+          <p className="text-xs text-center italic" style={{ color: 'var(--border)' }}>
+            Add a GEMINI_API_KEY to generate a fake review
+          </p>
         )}
       </div>
 

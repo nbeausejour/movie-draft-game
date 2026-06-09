@@ -6,18 +6,20 @@ import { SLOT_DEFS, MAX_PASSES } from '@/lib/types'
 import GameCard from '@/components/GameCard'
 import Roster from '@/components/Roster'
 import Results from '@/components/Results'
+import GenreWheel from '@/components/GenreWheel'
 
 function freshSlots(): SlotDef[] {
   return SLOT_DEFS.map(def => ({ ...def, card: null }))
 }
 
-type Phase = 'loading' | 'drafting' | 'done'
+type Phase = 'loading' | 'drafting' | 'spinning' | 'done'
 
 export default function Page() {
   const [slots, setSlots]             = useState<SlotDef[]>(freshSlots)
   const [currentCard, setCurrentCard] = useState<CardData | null>(null)
   const [seenIds, setSeenIds]         = useState<number[]>([])
   const [passesLeft, setPassesLeft]   = useState(MAX_PASSES)
+  const [genre, setGenre]             = useState<string | null>(null)
   const [phase, setPhase]             = useState<Phase>('loading')
   const [error, setError]             = useState<string | null>(null)
 
@@ -70,7 +72,7 @@ export default function Page() {
     setSlots(next)
     const roles = neededRoles(next)
     if (roles.length === 0) {
-      setPhase('done')
+      setPhase('spinning')
     } else {
       drawCard(next, [...seenIds])
     }
@@ -88,18 +90,28 @@ export default function Page() {
     setSeenIds([])
     setPassesLeft(MAX_PASSES)
     setCurrentCard(null)
+    setGenre(null)
     drawCard(fresh, [])
+  }
+
+  function handleGenreSelected(g: string) {
+    setGenre(g)
+    setPhase('done')
   }
 
   const availableSlots = currentCard ? availableSlotsFor(currentCard.role, slots) : []
   const filledCount = slots.filter(s => s.card !== null).length
+
+  if (phase === 'spinning') {
+    return <GenreWheel onComplete={handleGenreSelected} />
+  }
 
   if (phase === 'done') {
     return (
       <main className="min-h-screen px-4 py-10 flex justify-center" style={{ background: 'var(--parchment)' }}>
         <div className="w-full max-w-md">
           <Header />
-          <Results slots={slots} onPlayAgain={handlePlayAgain} />
+          <Results slots={slots} genre={genre!} onPlayAgain={handlePlayAgain} />
         </div>
       </main>
     )
