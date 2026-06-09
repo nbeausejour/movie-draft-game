@@ -52,7 +52,11 @@ Start your response with just the title on its own line, then a blank line, then
       }
     )
 
-    if (!res.ok) return Response.json({ summary: null, title: null })
+    if (!res.ok) {
+      const errText = await res.text()
+      console.error('Gemini error', res.status, errText)
+      return Response.json({ summary: null, title: null })
+    }
     const data = await res.json()
     const text: string = data.candidates?.[0]?.content?.parts?.[0]?.text ?? ''
 
